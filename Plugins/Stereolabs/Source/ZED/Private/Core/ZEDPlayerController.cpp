@@ -72,19 +72,24 @@ AZEDPlayerController::AZEDPlayerController()
 	PrimaryActorTick.bTickEvenWhenPaused = false;
 	PrimaryActorTick.TickGroup = ETickingGroup::TG_PrePhysics;
 
+	// 加载两个材质
 	static ConstructorHelpers::FObjectFinder<UMaterial> PostProcessFadeMaterial(TEXT("Material'/Stereolabs/ZED/Materials/M_ZED_Fade.M_ZED_Fade'"));
 	PostProcessFadeSourceMaterial = PostProcessFadeMaterial.Object;
 
 	static ConstructorHelpers::FObjectFinder<UMaterial> PostProcessZedMaterial(TEXT("Material'/Stereolabs/ZED/Materials/M_ZED_PostProcess.M_ZED_PostProcess'"));
 	PostProcessZedSourceMaterial = PostProcessZedMaterial.Object;
 	
+	//动画的时间曲线，用于控制 淡入淡出动画
 	static ConstructorHelpers::FObjectFinder<UCurveFloat> FadeCurve(TEXT("CurveFloat'/Stereolabs/ZED/Utility/C_Fade.C_Fade'"));
 	FadeTimelineCurve = FadeCurve.Object;
 
+	// 动画时间线类
 	FadeTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("FadeTimeline"));
-	FadeTimeline->SetTimelineLength(0.75f);
+	FadeTimeline->SetTimelineLength(0.75f);  // 时间线的总长度是0.75秒
 
+	// 将时间线的回调函数绑定到当前类的 Fading 方法。Fading 方法会在时间线更新时被调用
 	FadeFunction.BindUFunction(this, "Fading");
+	// 浮点曲线与时间线绑定，并设置回调函数。这意味着时间线会根据曲线的值调用 Fading 方法来实现淡入/淡出效果
 	FadeTimeline->AddInterpFloat(FadeTimelineCurve, FadeFunction);
 }
 
@@ -136,11 +141,14 @@ void AZEDPlayerController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 }
 
-void AZEDPlayerController::BeginPlay()
+void AZEDPlayerController::BeginPlay() // 生命周期函数
 {
+	// 判断当前的控制器时不是 第一个 playerController
 	bIsFirstPlayer = (GetWorld()->GetFirstPlayerController() == this);
 
+	// 判断game当前是不是单机模式
 	bool bIsStandalone = UKismetSystemLibrary::IsStandalone(this);
+	// 判断当前是否是本地玩家控制器
 	bool bIsLocal = IsLocalPlayerController();
 
 #if WITH_EDITOR
@@ -295,6 +303,7 @@ UObject* AZEDPlayerController::SpawnPawn(UClass* NewPawnClass, bool bPossess)
 
 void AZEDPlayerController::SpawnZedCameraActor()
 {
+	// 在当前世界（UWorld）中生成一个 AZEDCamera 类型的 actor。AZEDCamera 是一个继承自 AActor 的类，用于表示 ZED 相机
 	ZedCamera = GetWorld()->SpawnActor<AZEDCamera>();
 }
 
@@ -306,13 +315,18 @@ void AZEDPlayerController::Init()
 	}
 
 	// Attach Zed camera actor to pawn
+	// 将 ZED 相机 actor 绑定到 ZedPawn 的根组件（GetRootComponent()）。这意味着相机的位置和旋转将相对于 pawn 的根组件
+	// FAttachmentTransformRules 表示相机的位置和旋转将保持与 pawn 的相对关系
 	ZedCamera->AttachToComponent(ZedPawn->GetRootComponent(), FAttachmentTransformRules(EAttachmentRule::KeepRelative, EAttachmentRule::KeepRelative, EAttachmentRule::KeepRelative, false));
 
 	// Create dynamic post process
+	// 创建动态材质实例。动态材质实例允许在运行时修改材质的参数。
 	PostProcessFadeMaterialInstanceDynamic = UMaterialInstanceDynamic::Create(PostProcessFadeSourceMaterial, nullptr);
 	PostProcessZedMaterialInstanceDynamic = UMaterialInstanceDynamic::Create(PostProcessZedSourceMaterial, nullptr);
 
 	// Bind events to proxy
+	// 绑定事件代理，当GSlCameraProxy(全局代理对象)的OnAIModelOptimized属性变化时，调用ZedReady函数
+	// GSlCameraProxy->OnAIModelOptimized 是对象属性界面上 可修改的选项
 	GSlCameraProxy->OnAIModelOptimized.AddDynamic(this, &AZEDPlayerController::ZedReady);
 	GSlCameraProxy->OnCameraOpened.AddDynamic(this, &AZEDPlayerController::ZedCameraOpened);
 	GSlCameraProxy->OnCameraDisconnected.AddDynamic(this, &AZEDPlayerController::ZedCameraDisconnected);
@@ -322,15 +336,19 @@ void AZEDPlayerController::Init()
 	GSlCameraProxy->OnSVOSetBackInTime.AddDynamic(this, &AZEDPlayerController::ZedSVOIsSetBackInTime);
 
 	// Bind event to Zed camera actor
+	// 这是 ZED 相机 actor 的事件委托，当相机 actor 初始化完成时触发
 	ZedCamera->OnCameraActorInitialized.AddDynamic(this, &AZEDPlayerController::ZedCameraActorInitialized);
 
 	// Pawn tracking
+	// 当 ZED 相机的跟踪数据更新时触发
 	ZedCamera->OnTrackingDataUpdated.AddDynamic(ZedPawn, &AZEDPawn::ZedCameraTrackingUpdated);
 
 	// Enable fade post process
+	// 将动态材质实例添加到相机的后处理效果中，权重为 1.0f。这意味着淡入/淡出效果将被启用
 	ZedPawn->Camera->AddOrUpdateBlendable(PostProcessFadeMaterialInstanceDynamic, 1.0f);
 
 	// User init
+	// 这是一个蓝图可实现事件（BlueprintImplementableEvent），允许用户在蓝图中自定义初始化逻辑
 	InitEvent();
 
 	bInit = true;
@@ -338,6 +356,10 @@ void AZEDPlayerController::Init()
 	// Open camera next frame
 	if (bOpenZedCameraAtInit)
 	{
+		// 设置一个定时器，延迟调用 Internal_Init() 方法
+		// 0.001f：延迟时间为 0.001 秒（几乎立即调用）
+		// false：表示定时器只触发一次
+		// 为了确保在当前帧的初始化逻辑完成后，再执行相机的打开操作，避免潜在的同步问题。
 		GetWorldTimerManager().SetTimer(InitTimerHandle, this, &AZEDPlayerController::Internal_Init, 0.001f, false);
 	}
 }
@@ -368,10 +390,12 @@ void AZEDPlayerController::Internal_CloseZedCamera()
 
 void AZEDPlayerController::OpenZedCamera()
 {
+	// 断言检查
 	checkf(bInit, TEXT("Init() not called before opening the camera"));
 
 	GetWorldTimerManager().ClearTimer(CameraOpeningTimerHandle);
 
+	// 关闭UI小组件
 	ZedPawn->ZedLoadingWidget->SetVisibility(false);
 	ZedPawn->ZedErrorWidget->SetVisibility(false);
 
@@ -381,6 +405,7 @@ void AZEDPlayerController::OpenZedCamera()
 void AZEDPlayerController::Internal_OpenZedCamera()
 {
 
+	// 设置UI组件外观
 	ZedPawn->ZedLoadingWidget->WidgetComponent->SetGeometryMode(EWidgetGeometryMode::Plane);
 	ZedPawn->ZedLoadingWidget->SetWorldScale3D(FVector(0.3f));
 
@@ -389,6 +414,7 @@ void AZEDPlayerController::Internal_OpenZedCamera()
 
 	// Get Zed initializer object
 	TArray<AActor*> ZedInitializer;
+	// 在当前世界中查找所有属于 AZEDInitializer 类型的 actor， 结果存储在ZedInitializer指针中
 	UGameplayStatics::GetAllActorsOfClass(this, AZEDInitializer::StaticClass(), ZedInitializer);
 
 	if (!ZedInitializer.Num())
@@ -397,6 +423,7 @@ void AZEDPlayerController::Internal_OpenZedCamera()
 		return;
 	}
 
+	// 将第一个找到的初始化器 actor 转换为 AZEDInitializer 类型
 	AZEDInitializer* Initializer = static_cast<AZEDInitializer*>(ZedInitializer[0]);
 
 	// Load
