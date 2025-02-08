@@ -18,7 +18,7 @@
 UCLASS(Category = "Stereolabs|Zed")
 class ZED_API AZEDPawn : public APawn
 {
-	friend class AZEDPlayerController;
+	friend class AZEDPlayerController;  // 声明 AZEDPlayerController 为友元类，允许它访问 AZEDPawn 的私有成员
 
 	GENERATED_BODY()
 
@@ -29,6 +29,7 @@ private:
 	/*
 	 * Event binded to OnTrackingDataUpdated
 	 * @param NewTrackingData The new tracking data
+	 当ZED相机的追踪数据更新时调用的事件处理函数，用于处理新的追踪数据。
 	 */
 	UFUNCTION()
 	void ZedCameraTrackingUpdated(const FZEDTrackingData& NewTrackingData);
@@ -48,20 +49,20 @@ public:
 
 	/** Main camera */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UCineCameraComponent* Camera;
+	UCineCameraComponent* Camera;  //定义了相机的类型
 
-	/** Should enable lerp with specified alpha*/
+	/** Should enable lerp[平滑插值] with specified alpha*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool EnableLerp;
+	bool EnableLerp;  // 使能平滑插值
 
 	/** Lerp Speed value*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float LerpIntensity;
+	float LerpIntensity; // 平滑插值的速度
 
 	/** Transform used during Lerp smoothing*/
-	FTransform LerpTransform;
+	FTransform LerpTransform;  // 差值后的 位姿
 
-	/** Boolean used as toggle to enable/disable freezing the virtual camera to reposition the real camera*/
+	/** Boolean used as toggle[切换] to enable/disable freezing[冻结] the virtual camera to reposition the real camera*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool ToggleFreeze;
 
@@ -70,6 +71,7 @@ public:
 	bool UseRotationOffset;
 
 	/** Has the camera been frozen by the toggle freeze*/
+	// 是否处于冻结状态  frozen[冻结]
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool IsFrozen;
 
@@ -77,8 +79,8 @@ public:
 	UFUNCTION()
 	void SetStartOffsetLocation(const FVector& locOffset);
 
-	FVector StartOffsetLocation;
-
+	FVector StartOffsetLocation;  // 起始位置偏移量
+  
 	// If there is a translation modifier different than (1,1,1), it will also apply on the translation
 	// given by the boolean "bSetFloorAsOrigin" of the tracking parameters, which will move the ZEDPawn
 	// accordingly to the height of the real camera.
@@ -86,27 +88,27 @@ public:
 	bool SetFloorAsOriginCorrected;
 	
 	/** The previous location given by the slcamera (not the last frame)*/
-	FVector PreviousLocation;
+	FVector PreviousLocation; //上一帧的位置
 	
 	/** From Previous to current location given by the slcamera*/
-	FVector PreviousToCurrentLocation;
+	FVector PreviousToCurrentLocation; // 从上一帧到当前帧的位置差
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector TranslationMultiplier;
+	FVector TranslationMultiplier;  //位置缩放因子
 
 	FVector RealTranslationToVirtualTranslation(const FVector& realTranslation);
 	/** The new virtual target location for lerp and direct movement*/
-	FVector VirtualLocation;
-	FVector PrevVirtualLocation;
+	FVector VirtualLocation;  //虚拟目标位置
+	FVector PrevVirtualLocation; //上一帧的虚拟目标位置
 
 
 	/** Zed loading widget */
 	UPROPERTY()
-	UZEDWidget* ZedLoadingWidget;
+	UZEDWidget* ZedLoadingWidget;  // 加载界面
 
 	/** Zed error widget */
 	UPROPERTY()
-	UZEDWidget* ZedErrorWidget;
+	UZEDWidget* ZedErrorWidget; //错误提示的UI界面
 
 	/** Remap material resource */
 	UPROPERTY()

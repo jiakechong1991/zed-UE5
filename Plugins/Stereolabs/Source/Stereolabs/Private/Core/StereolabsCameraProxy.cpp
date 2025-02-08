@@ -742,6 +742,7 @@ int USlCameraProxy::GetCameraID()
 	return CameraID;
 }
 
+// 获得camera的位置信息
 SL_POSITIONAL_TRACKING_STATE USlCameraProxy::GetCameraPosition(SL_PoseData* pose, SL_REFERENCE_FRAME rframe)
 {
 	if (sl_is_opened(CameraID))

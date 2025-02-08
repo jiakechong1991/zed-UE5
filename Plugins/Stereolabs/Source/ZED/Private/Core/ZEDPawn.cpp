@@ -39,21 +39,25 @@ AZEDPawn::AZEDPawn()
 {
 	TransformOffset = FTransform();
 	ToggleFreeze = false;
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = true; //// 启用每帧调用Tick函数
 
+	// 创建根组件
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 
+	// 创建SpringArm组件并附加到根组件
 	SpringArm = CreateDefaultSubobject<USceneComponent>(TEXT("SpringArm"));
 	SpringArm->SetupAttachment(RootComponent);
 
+	// 创建主相机组件并附加到SpringArm
 	Camera = CreateDefaultSubobject<UCineCameraComponent>(TEXT("MainCamera"));
 	Camera->SetupAttachment(SpringArm);
-	Camera->SetFieldOfView(80);
+	Camera->SetFieldOfView(80); // 设置相机视场角
 
-	Camera->bConstrainAspectRatio = true;
+	Camera->bConstrainAspectRatio = true; // 保持宽高比
 	Camera->PostProcessSettings.VignetteIntensity = 0.0f;
 	Camera->PostProcessSettings.bOverride_VignetteIntensity = true;
 
+	// 加载UI相关的资源
 	// Widget material
 	static ConstructorHelpers::FObjectFinder<UMaterial> ZedWidgetMaterial(TEXT("Material'/Stereolabs/ZED/Materials/M_ZED_3DWidgetPassthroughNoDepth.M_ZED_3DWidgetPassthroughNoDepth'"));
 	ZedWidgetSourceMaterial = ZedWidgetMaterial.Object;
@@ -96,26 +100,32 @@ AZEDPawn::AZEDPawn()
 	ZedErrorWidget->WidgetComponent->SetBlendMode(EWidgetBlendMode::Transparent);
 	ZedErrorWidget->SetVisibility(false);
 
+	// 设置自动拥有玩家的模式
 	AutoPossessPlayer = EAutoReceiveInput::Disabled;
 
 	static ConstructorHelpers::FObjectFinder<UMaterial> RemapMaterial(TEXT("Material'/Stereolabs/Stereolabs/Materials/M_SL_RPP.M_SL_RPP'"));
 	RemapSourceMaterial = RemapMaterial.Object;
 }
 
+// 将 ZED相机的追踪数据更新时 调用的事件处理函数，用于处理新的追踪数据
 void AZEDPawn::ZedCameraTrackingUpdated(const FZEDTrackingData& NewTrackingData)
 {
 	PreviousLocation = RealCameraTransform.GetLocation();
 	RealCameraTransform = NewTrackingData.OffsetZedWorldTransform;
+	
+	// 计算从上一帧到当前帧的位置差
 	PreviousToCurrentLocation = RealCameraTransform.GetLocation() - PreviousLocation;
 
 	PrevVirtualLocation = VirtualLocation;
+	// 更新虚拟位置
 	VirtualLocation = PrevVirtualLocation + RealTranslationToVirtualTranslation(PreviousToCurrentLocation);
 
 	if (ToggleFreeze) {
 		if (IsFrozen) {
-			// set new offset
+			// set new offset 设置 位置
 			VirtualLocation = GetActorTransform().GetLocation();
 
+			// 设置旋转
 			if (UseRotationOffset) {
 				// Get the rotational difference between where the actor is facing and the "real" camera orientation.
 				// [Actor - Real] is [Actor * Real.Inv] in quaternion
@@ -140,11 +150,12 @@ void AZEDPawn::SetStartOffsetLocation(const FVector& locOffset)
 void AZEDPawn::Tick(float DeltaSeconds)
 {
 	if (!IsFrozen) {
-		if (EnableLerp)
+		if (EnableLerp) // 是否启用平滑
 		{
 			// Apply rotational offset on transform as global rotation
-
+			// 插值系数
 			float lerpAlpha = DeltaSeconds * LerpIntensity;
+			// 计算插值后的 位姿
 			LerpTransform = UKismetMathLibrary::TLerp(
 				LerpTransform,
 				FTransform(

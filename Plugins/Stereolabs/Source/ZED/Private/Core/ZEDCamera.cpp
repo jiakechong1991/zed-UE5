@@ -216,6 +216,7 @@ bool AZEDCamera::CanEditChange(const FProperty* InProperty) const
 }
 #endif
 
+// 将camera的位置和旋转信息更新到ZEDWorldTransform和OffsetZedWorldTransform中
 void AZEDCamera::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -314,6 +315,7 @@ void AZEDCamera::GrabCallback(ESlErrorCode ErrorCode, const FSlTimestamp& Timest
 
 	SL_SCOPE_LOCK(Lock, TrackingUpdateSection)
 		SL_PoseData Pose;
+		// 获得camera的位置信息
 		SL_POSITIONAL_TRACKING_STATE TrackingState = GSlCameraProxy->GetCameraPosition(&Pose, SL_REFERENCE_FRAME_WORLD);
 		CurrentFrameTrackingData.TrackingState = (ESlTrackingState)TrackingState;
 		CurrentFrameTrackingData.Timestamp = Timestamp;
@@ -338,6 +340,7 @@ void AZEDCamera::GrabCallback(ESlErrorCode ErrorCode, const FSlTimestamp& Timest
 		if (GSlCameraProxy->GetCameraModel() != ESlModel::M_Zed)
 		{
 			sl::Rotation imuPose;
+			// 获得camera-imu的旋转信息
 			SL_ERROR_CODE IMUErrorCode  = GSlCameraProxy->GetCameraIMURotationAtImage(imuPose);
 			if (IMUErrorCode == SL_ERROR_CODE_SUCCESS)
 			{

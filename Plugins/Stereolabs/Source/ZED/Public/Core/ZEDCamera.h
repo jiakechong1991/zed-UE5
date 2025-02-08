@@ -325,6 +325,7 @@ private:
 	UMaterial* ZedSourceMaterial;
 
 	/** The tracking data of the current grab frame */
+	// camera的追踪信息，就在这里,包括：camera-position, camera-ratation
 	FZEDTrackingData CurrentFrameTrackingData;
 
 	/** The grab delegate handle */
